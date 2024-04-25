@@ -4,6 +4,29 @@ from tkinter import Canvas, Label, StringVar, Tk, Entry, messagebox
 from tkinter import ttk
 from tkinter.ttk import Combobox
 from datetime import datetime
+import sqlite3
+
+
+list = []
+
+
+file = open ('db.db.sql', 'r', encoding = 'utf-8')
+build_db = file.read()
+file.close
+
+connector = sqlite3.connect ('db.db')
+cursor = connector.cursor()
+cursor = executescript (build_db)
+sql_services = cursor.execute ('SELECT * FROM services')
+
+#adding any new service in list
+for row in sql_services:
+    list.append(row[1])
+
+#writing changes in db
+connector.commit()
+cursor.close()
+connector.close()
 
 
 class MainLabel(Label):
@@ -117,7 +140,7 @@ class Combobox(ttk.Combobox):
 class GUI(Tk):
     def __init__(self):
         super().__init__()
-        self.geometry('600x600')
+        self.geometry('1200x600')
         self.title('window')
         self.configure(bg='#212B33')
         self.resizable(width=False, height=False)
@@ -129,11 +152,11 @@ class GUI(Tk):
         self.mainloop()
 
     def __canvas(self):
-        self.canva = Canvas(width=600, height=600, bg="#212B33")
+        self.canva = Canvas(width=1200, height=600, bg="#212B33")
         self.canva.place(relx=0.5, rely=0.5, anchor='center')
 
     def __label(self):
-        label_title = MainLabel(self, 'AUTOSERVICE PLATINUM', 'Montserrat', 'bold', 85, 50)
+        label_title = MainLabel(self, 'AUTOSERVICE', 'Montserrat', 'bold', 483, 50)
 
         label_model = text (self, 'Модель автомобиля', 'Montserrat', 40, 150)
 
@@ -167,7 +190,7 @@ class GUI(Tk):
 
 
     def __button(self):
-        button1 = ButtonField(self, 'записать', 'Montserrat', 450, 550, 10, self)
+        button1 = ButtonField(self, 'записать', 'Montserrat', 550, 550, 10, self)
 
     def __combobox(self):
         list_values = [
@@ -176,6 +199,11 @@ class GUI(Tk):
             'замена шин', 'мойка']
 
         self.service_combobox = Combobox(self, 350, 400, 200, list_values, 'Montserrat 15', self)
+
+
+def __new_combobox (self):
+    global list
+    self.service_combobox = my_combobox (list, 'Arial 15', 450, 200, 200)
 
 
 if __name__ == "__main__":
