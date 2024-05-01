@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 .DS_store 
 auto.db
 auto.db.sql
 auto.sqbpro
 db
+=======
+.DS_store
+>>>>>>> 70ba208 (add .gitignore)
