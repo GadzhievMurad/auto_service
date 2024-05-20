@@ -2,7 +2,7 @@ from tkinter import *
 from tkinter import messagebox
 from tkinter.ttk import Combobox
 from datetime import datetime
-import sqlite3
+import psycopg2
 
 
 class MainLabel(Label):
@@ -21,11 +21,7 @@ class EntryField(Entry):
     def __init__(self, master, font_name, x, y, width, font_size=15):
         super().__init__(master, font=(font_name, font_size), width=width, textvariable=StringVar())
         self.place(x=x, y=y)
-        #self.name = None
-
-        #def set_name(self, name):
-        #self.name = name
-
+     
 
 
 class ButtonField(Button):
@@ -36,70 +32,46 @@ class ButtonField(Button):
 
     def click(self):
         if all(hasattr(self.window, f"{field}_entry") for field in
-               ['marka', 'model', 'color', 'year_build', 'num', 'name', 'surname', 'usernum']):
+               ['brand', 'model', 'year_build', 'color', 'num', 'name', 'phone']):
             if any(not getattr(self.window, f"{field}_entry").get() for field in
-                   ['marka', 'model', 'color', 'year_build', 'num', 'name', 'usernum']):
+                   ['brand', 'model', 'year_build', 'color', 'num', 'name', 'phone']):
                 messagebox.showerror('Ошибка', 'Пожалуйста, заполните все поля.')
             else:
                 try:
-                    conn = sqlite3.connect('auto.db')
+                    conn = psycopg2.connect(
+                        dbname="postgres",
+                        user="postgres",
+                        password="",
+                        port="5432"
+                    )
                     cursor = conn.cursor()
 
-                    cursor.execute(f"INSERT INTO auto (brand, model, color, year_build, num) VALUES (?, ?, ?, ?, ?)",
-                                   (self.window.marka_entry.get(), self.window.model_entry.get(),
+                    cursor.execute(f"INSERT INTO auto (brand, model, color, year_build, num) VALUES (%s, %s, %s, %s, %s)",
+                                   (self.window.brand_entry.get(), self.window.model_entry.get(),
                                     self.window.color_entry.get(), self.window.year_build_entry.get(),
                                     self.window.num_entry.get()))
 
-                    cursor.execute(f'SELECT last_insert_rowid()')
-                    id_auto = cursor.fetchone()[0]
-                    #n = id_auto
-                    #if n == id_auto:
-                    #   n+1
+                    cursor.execute(f'SELECT lastval()')
+                    auto_id = cursor.fetchone()[0]
 
-                    cursor.execute (f'INSERT INTO customer (name, surname, num_phone, id_auto) VALUES (?, ?, ?, ?)',
-                                    (self.window.name_entry.get(), self.window.surname_entry.get(),
-                                    self.window.num_entry.get(), id_auto ))
+                    cursor.execute (f'INSERT INTO customer (name, phone, auto_id) VALUES (%s, %s, %s)',
+                                    (self.window.name_entry.get(), self.window.phone_entry.get(), auto_id ))
+   
                     conn.commit()
                     conn.close()
 
                     selected_service = self.window.service_combobox.get()
-                    self.print_file(selected_service)
                     messagebox.showinfo('Внимание', 'Данные успешно добавлены')
 
-                except sqlite3.Error as e:
+                except psycopg2.Error as e:
                     messagebox.showerror('Ошибка', f'Ошибка при выполнении SQL-запроса: {e}')
 
         else:
             messagebox.showerror('Ошибка', 'Не удалось получить данные из полей ввода.')
-
-
-
-    def print_file(self, selected_service):
-        current_datetime = datetime.now()
-        file_path = 'report.md'
-        price = self.window.service_combobox.get_price(selected_service)
-
-        try:
-            with open(file_path, 'a', encoding='utf8') as file:
-                file.write('=============\n')
-                file.write(str(current_datetime)[:-7] + '\n')
-                file.write(' \n')
-                file.write('Модель:' + self.window.model_entry.get() + '\n')
-                file.write('Марка:' + self.window.marka_entry.get() + '\n')
-                file.write('Цвет:' + self.window.color_entry.get() + '\n')
-                file.write('Год производства:' + self.window.year_build_entry.get() + '\n')
-                file.write('Гос номер:' + self.window.num_entry.get() + '\n')
-                file.write(' \n')
-                file.write('Услуга: ' + selected_service + '\n')
-                file.write('Стоимость: ' + str(price) + 'руб.\n')
-                file.write('=============\n')
-                file.write(' \n')
-                file.write(' \n')
-
-        except Exception as e:
-            messagebox.showerror('Ошибка', f'Ошибка при записи в файл: {e}')
-
-
+     
+    
+    
+    
 class ServiceCombobox(Combobox):
     def __init__(self, master, x, y, width, state):
         super().__init__(master, width=width, state=state)
@@ -110,51 +82,66 @@ class ServiceCombobox(Combobox):
 
     def load_services(self):
         try:
-            conn = sqlite3.connect('auto.db')
+            conn = psycopg2.connect(
+                dbname="postgres",
+                user="postgres",
+                password="",
+                port="5432"
+            )
             cursor = conn.cursor()
 
             cursor.execute("SELECT name FROM services")
             self.list = [row[0] for row in cursor.fetchall()]
 
-        except sqlite3.Error as e:
+        except psycopg2.Error as e:
             messagebox.showerror('Database error', f'Error: {e}')
 
         finally:
-            cursor.close()
-            conn.close()
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
+
             self['values'] = self.list
 
     def get_price(self, selected_service):
         try:
-            conn = sqlite3.connect('auto.db')
+            conn = psycopg2.connect(
+                dbname="postgres",
+                user="postgres",
+                password="",
+                port="5432"
+            )
             cursor = conn.cursor()
 
-            cursor.execute("SELECT price FROM services WHERE name = ?", (selected_service,))
+            cursor.execute("SELECT price FROM services WHERE name = %s", (selected_service,))
             row = cursor.fetchone()
             price = row[0] if row else None
             return price
 
-        except sqlite3.Error as e:
+        except psycopg2.Error as e:
             messagebox.showerror('Database error', f'Error: {e}')
 
         finally:
-            cursor.close()
-            conn.close()
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
 
     def update_price_label(self):
         selected_service = self.get()
         price = self.get_price(selected_service)
 
-        #if hasattr(self, 'price_label'):
-        #   self.price_label.destroy()
-        #   print ('old price_label desroyed')
+        if hasattr(self, 'price_label'):
+            self.price_label.destroy()
+            print('old price_label destroyed')
 
         if price is not None:
             self.price_label = Label(text=f'Цена: {price} руб', font=('Arial', 18))
             self.price_label.place(x=350, y=440)
 
 
-class GUI(Tk):
+class GUI(Tk): #user window building class
     def __init__(self):
         super().__init__()
         self.geometry('1200x600')
@@ -176,41 +163,30 @@ class GUI(Tk):
         label_title = MainLabel(self, 'AUTOSERVICE', 'Arial', 'bold', 483, 50)
 
         label_model = TextLabel(self, 'Модель автомобиля', 'Arial', 40, 150)
-        label_marka = TextLabel(self, 'Марка автомобиля:', 'Arial', 40, 200)
+        label_brand = TextLabel(self, 'Марка автомобиля:', 'Arial', 40, 200)
         label_color = TextLabel(self, 'Цвет автомобиля:', 'Arial', 40, 250)
         label_year_build = TextLabel(self, 'Год производства автомобиля:', 'Arial', 40, 300)
         label_num = TextLabel(self, 'Номера автомобиля:', 'Arial', 40, 350)
         combobox_label = TextLabel(self, 'Выберите услугу из списка:', 'Arial', 40, 400)
         name = TextLabel(self, 'Имя:', 'Arial', 750, 150)
-        surname = TextLabel(self, 'Фамилия:', 'Arial', 750, 200)
-        autonum = TextLabel(self, 'Номер телефона:', 'Arial', 750, 250)
+        autonum = TextLabel(self, 'Номер телефона:', 'Arial', 750, 200)
         self.price_label = TextLabel(self, '', 'Arial', 350, 440)
 
     def __entry(self):
-        self.marka_entry = EntryField(self, 'Arial', 350, 152, 15)
-        #self.marka_entry.set_name('marka')
-
+        self.brand_entry = EntryField(self, 'Arial', 350, 152, 15)
+       
         self.model_entry = EntryField(self, 'Arial', 350, 202, 15)
-        #self.model_entry.set_name('model')
-
+        
         self.color_entry = EntryField(self, 'Arial', 350, 252, 15)
-        #self.color_entry.set_name('color')
-
+        
         self.year_build_entry = EntryField(self, 'Arial', 350, 302, 15)
-        #self.year_build_entry.set_name('year_build')
-
+        
         self.num_entry = EntryField(self, 'Arial', 350, 352, 15)
-        #self.num_entry.set_name('num')
-
+       
         self.name_entry = EntryField(self, 'Arial', 940, 152, 15)
-        #self.name_entry.set_name('name')
-
-        self.surname_entry = EntryField(self, 'Arial', 940, 202, 15)
-        #self.surname_entry.set_name('surname')
-
-        self.usernum_entry = EntryField(self, 'Arial', 940, 252, 15)
-        #self.usernum_entry.set_name('usernum')
-
+                 
+        self.phone_entry = EntryField(self, 'Arial', 940, 202, 15)
+        
     def __button(self):
         button1 = ButtonField(self, 'записать', 'Arial', 550, 550, 10, self)
 
